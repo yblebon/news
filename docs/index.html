@@ -50,7 +50,7 @@
             gap: 10px;
             margin-bottom: 20px;
         }
-        .tag {
+        .tag, .sort-btn, .news-count-select {
             padding: 8px 12px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -59,13 +59,28 @@
             font-size: 0.9em;
             transition: all 0.2s;
         }
-        .tag:hover {
+        .tag:hover, .sort-btn:hover, .news-count-select:hover {
             background-color: #e0e0e0;
         }
         .tag.active {
             background-color: #1a0dab;
             color: #fff;
             border-color: #1a0dab;
+        }
+        .sort-btn {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .sort-btn.active {
+            background-color: #1a0dab;
+            color: #fff;
+            border-color: #1a0dab;
+        }
+        .news-count-select {
+            background-color: #f8f9fa;
+            appearance: menulist;
+            -webkit-appearance: menulist;
+            -moz-appearance: menulist;
         }
         .news-container {
             display: flex;
@@ -169,12 +184,13 @@
     <h1>Latest Google News</h1>
     <div class="controls">
         <div>
-            <label for="news-count">Number of articles: </label>
-            <select id="news-count">
-                <option value="5">5</option>
-                <option value="10" selected>10</option>
-                <option value="15">15</option>
-                <option value="20">20</option>
+            <label for="language-select">Language: </label>
+            <select id="language-select">
+                <option value="en|US" selected>English</option>
+                <option value="fr|FR">French</option>
+                <option value="es|ES">Spanish</option>
+                <option value="de|DE">German</option>
+                <option value="it|IT">Italian</option>
             </select>
         </div>
         <div>
@@ -184,6 +200,13 @@
         <button id="refresh-btn">Refresh News</button>
     </div>
     <div class="tags">
+        <button id="sort-btn" class="sort-btn">Sort: Newest First</button>
+        <select id="news-count" class="news-count-select">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+        </select>
         <button class="tag active" data-topic="all">All</button>
         <button class="tag" data-topic="technology">Technology</button>
         <button class="tag" data-topic="sports">Sports</button>
@@ -201,16 +224,19 @@
         <div class="modal-content">
             <p>Warning: News about "<span id="warning-topic"></span>" may contain distressing or sensitive content. Proceed?</p>
             <button class="accept-btn" id="accept-warning">Continue</button>
-            <button class="cancel-btn" id="cancel-warning">Go Back</button>
+            <button class="cancel-btn" id="cancel-btn">Cancel</button>
         </div>
     </div>
 
     <script>
         // Track warnings shown in session
         const shownWarnings = {
-            death: sessionStorage.getItem('warning-death') === 'shown',
-            accident: sessionStorage.getItem('warning-accident') === 'shown'
+            death: sessionStorage.getItem('warning-death') === 'true',
+            accident: sessionStorage.getItem('warning-accident') === 'true'
         };
+
+        // Default sort order: descending (newest first)
+        let isSortDescending = true;
 
         async function fetchWithRetry(url, retries = 2, delay = 1000) {
             for (let i = 0; i < retries; i++) {
@@ -219,8 +245,8 @@
                     if (response.ok) return response;
                     throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
                 } catch (error) {
+                    console.warn(`Retry ${i + 1}/${retries} for ${url}: ${error.message}`);
                     if (i < retries - 1) {
-                        console.warn(`Retry ${i + 1}/${retries} for ${url} after error: ${error.message}`);
                         await new Promise(resolve => setTimeout(resolve, delay));
                         continue;
                     }
@@ -233,26 +259,43 @@
             const newsContainer = document.getElementById('news');
             const newsCount = parseInt(document.getElementById('news-count').value);
             const refreshBtn = document.getElementById('refresh-btn');
+            const sortBtn = document.getElementById('sort-btn');
+            const languageSelect = document.getElementById('language-select');
+            const newsCountSelect = document.getElementById('news-count');
             const activeTag = document.querySelector('.tag.active');
             const topic = activeTag.dataset.topic;
             const location = document.getElementById('location-search').value.trim();
+            const [language, region] = languageSelect.value.split('|');
 
-            // Disable button during fetch
+            // Disable buttons during fetch
             refreshBtn.disabled = true;
+            sortBtn.disabled = true;
+            languageSelect.disabled = true;
+            newsCountSelect.disabled = true;
             newsContainer.innerHTML = '<p class="loading">Loading news...</p>';
 
             try {
                 // Log request details
-                const requestDetails = { topic, location, newsCount, timestamp: new Date().toISOString() };
+                const requestDetails = { 
+                    topic, 
+                    location, 
+                    newsCount, 
+                    sortOrder: isSortDescending ? 'descending (newest first)' : 'ascending (oldest first)', 
+                    language, 
+                    region, 
+                    timestamp: new Date().toLocaleString('en-US', { timeZone: 'UTC' })
+                };
                 console.log('Fetching news with details:', requestDetails);
 
-                // Construct RSS URL
+                // Construct RSS URL with language and region parameters
                 const baseUrl = 'https://news.google.com/rss';
                 let query = topic === 'all' ? '' : topic;
                 if (location) {
                     query = query ? `${query}+in+${location}` : `in+${location}`;
                 }
-                const rssUrl = query ? `${baseUrl}/search?q=${encodeURIComponent(query)}` : baseUrl;
+                const rssUrl = query 
+                    ? `${baseUrl}/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`
+                    : `${baseUrl}?hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`;
                 console.log('Request URL:', rssUrl);
 
                 // Fetch with retry
@@ -266,14 +309,21 @@
                     throw new Error('Failed to parse RSS feed XML');
                 }
 
-                const items = xml.querySelectorAll('item');
+                const items = Array.from(xml.querySelectorAll('item'));
                 console.log(`Found ${items.length} news items`);
+
+                // Sort items by pubDate (default: newest first)
+                items.sort((a, b) => {
+                    const dateA = new Date(a.querySelector('pubDate')?.textContent || 0);
+                    const dateB = new Date(b.querySelector('pubDate')?.textContent || 0);
+                    return isSortDescending ? dateB - dateA : dateB - dateA;
+                });
 
                 // Clear loading message
                 newsContainer.innerHTML = '';
 
                 // Display articles
-                Array.from(items).slice(0, newsCount).forEach((item, index) => {
+                items.slice(0, newsCount).forEach((item, index) => {
                     const title = item.querySelector('title')?.textContent || 'No title';
                     const link = item.querySelector('link')?.textContent || '#';
                     const pubDate = item.querySelector('pubDate')?.textContent || 'No date';
@@ -299,11 +349,11 @@
 
                 // Handle empty results
                 if (items.length === 0) {
-                    const errorMsg = location ? 
-                        `No news articles found for ${topic} in ${location}.` : 
-                        `No news articles found for ${topic}.`;
+                    const errorMsg = location 
+                        ? `No news articles found for ${topic} in ${location} (${languageSelect.options[languageSelect.selectedIndex].text}).` 
+                        : `No news articles found for ${topic} (${languageSelect.options[languageSelect.selectedIndex].text}).`;
                     newsContainer.innerHTML = `<p class="error">${errorMsg}</p>`;
-                    console.warn('No articles found:', { topic, location });
+                    console.warn('No articles found:', { topic, location, language, region });
                 }
             } catch (error) {
                 // Detailed error handling
@@ -326,8 +376,11 @@
 
                 newsContainer.innerHTML = `<p class="error">${errorMsg}</p>`;
             } finally {
-                // Re-enable button
+                // Re-enable buttons
                 refreshBtn.disabled = false;
+                sortBtn.disabled = false;
+                languageSelect.disabled = false;
+                newsCountSelect.disabled = false;
             }
         }
 
@@ -341,15 +394,17 @@
             const modal = document.getElementById('content-warning');
             const warningTopic = document.getElementById('warning-topic');
             const acceptBtn = document.getElementById('accept-warning');
-            const cancelBtn = document.getElementById('cancel-warning');
+            const cancelBtn = document.getElementById('cancel-btn');
 
+            console.log(`Showing content warning for ${topic}`);
             warningTopic.textContent = topic.charAt(0).toUpperCase() + topic.slice(1);
             modal.style.display = 'flex';
 
             // Handle accept
             const acceptHandler = () => {
+                console.log(`User accepted warning for ${topic}`);
                 shownWarnings[topic] = true;
-                sessionStorage.setItem(`warning-${topic}`, 'shown');
+                sessionStorage.setItem(`warning-${topic}`, 'true');
                 modal.style.display = 'none';
                 acceptBtn.removeEventListener('click', acceptHandler);
                 cancelBtn.removeEventListener('click', cancelHandler);
@@ -358,7 +413,7 @@
 
             // Handle cancel
             const cancelHandler = () => {
-                // Switch back to "All" topic
+                console.log(`User cancelled warning for ${topic}, reverting to 'all'`);
                 document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
                 document.querySelector('.tag[data-topic="all"]').classList.add('active');
                 modal.style.display = 'none';
@@ -387,7 +442,7 @@
             });
         });
 
-        // Event listeners for refresh, news count, and location search
+        // Event listeners for refresh, news count, location input, language select, and sort
         document.getElementById('refresh-btn').addEventListener('click', () => {
             const activeTopic = document.querySelector('.tag.active').dataset.topic;
             if (activeTopic === 'death' || activeTopic === 'accident') {
@@ -396,11 +451,30 @@
                 fetchNews();
             }
         });
-        document.getElementById('news-count').addEventListener('change', fetchNews);
+        document.getElementById('news-count').addEventListener('change', () => {
+            console.log(`Number of articles changed to: ${document.getElementById('news-count').value}`);
+            fetchNews();
+        });
         document.getElementById('location-search').addEventListener('input', () => {
             clearTimeout(window.searchTimeout);
             window.searchTimeout = setTimeout(fetchNews, 300);
         });
+        document.getElementById('language-select').addEventListener('change', () => {
+            const [language, region] = document.getElementById('language-select').value.split('|');
+            console.log(`Language changed to: ${language}, region: ${region}`);
+            fetchNews();
+        });
+        document.getElementById('sort-btn').addEventListener('click', () => {
+            isSortDescending = !isSortDescending;
+            const sortBtn = document.getElementById('sort-btn');
+            sortBtn.textContent = `Sort: ${isSortDescending ? 'Newest First' : 'Oldest First'}`;
+            sortBtn.classList.toggle('active');
+            console.log(`Sort order changed to: ${isSortDescending ? 'descending (newest first)' : 'ascending (oldest first)'}`);
+            fetchNews();
+        });
+
+        // Log default sort order and language on load
+        console.log('Page loaded with default sort order: descending (newest first), language: en, region: US');
 
         // Fetch news when page loads
         window.onload = fetchNews;
