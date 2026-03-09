@@ -4,480 +4,671 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Latest Google News</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink: #1a1a2e;
+            --ink-muted: #4a4a6a;
+            --ink-faint: #8888aa;
+            --accent: #c0392b;
+            --accent-hover: #a93226;
+            --surface: #fafaf8;
+            --card: #ffffff;
+            --border: #e4e4f0;
+            --tag-active-bg: #1a1a2e;
+            --tag-active-fg: #fafaf8;
+            --shadow: 0 2px 12px rgba(26,26,46,0.08);
+            --shadow-hover: 0 6px 24px rgba(26,26,46,0.14);
+            --radius: 10px;
+            --font-head: 'Playfair Display', Georgia, serif;
+            --font-body: 'DM Sans', system-ui, sans-serif;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            font-family: var(--font-body);
+            background: var(--surface);
+            color: var(--ink);
+            min-height: 100vh;
+            padding: 0 0 60px;
         }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .controls select, .controls input, .controls button {
-            padding: 8px 12px;
-            font-size: 1em;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .controls input {
-            cursor: text;
-            min-width: 150px;
-        }
-        .controls button {
-            background-color: #1a0dab;
+
+        /* ── Header ─────────────────────────────── */
+        header {
+            background: var(--ink);
             color: #fff;
-            border: none;
-            transition: background-color 0.2s;
+            padding: 28px 24px 24px;
+            text-align: center;
+            border-bottom: 3px solid var(--accent);
         }
-        .controls button:hover {
-            background-color: #0d47a1;
+        header h1 {
+            font-family: var(--font-head);
+            font-size: clamp(1.6rem, 4vw, 2.4rem);
+            letter-spacing: -0.5px;
+            color: #fff;
         }
-        .tags {
+        header p.subtitle {
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: #aaa;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        /* ── Controls bar ───────────────────────── */
+        .controls-bar {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(26,26,46,0.06);
         }
-        .tag, .sort-btn, .news-count-select {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: #fff;
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--ink-muted);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        select, input[type="text"] {
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            padding: 7px 11px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--ink);
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        select:focus, input[type="text"]:focus {
+            border-color: var(--ink);
+        }
+        button[type="button"] {
+            font-family: var(--font-body);
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 7px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--ink);
             cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.2s;
+            transition: all 0.15s;
+            white-space: nowrap;
         }
-        .tag:hover, .sort-btn:hover, .news-count-select:hover {
-            background-color: #e0e0e0;
+        button[type="button"]:hover:not(:disabled) {
+            background: var(--ink);
+            color: #fff;
+            border-color: var(--ink);
+        }
+        button[type="button"]:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        #refresh-btn {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        #refresh-btn:hover:not(:disabled) {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        /* ── Tags ───────────────────────────────── */
+        .tags-bar {
+            padding: 14px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .tag {
+            font-size: 0.83rem;
+            font-weight: 500;
+            padding: 6px 13px;
+            border: 1.5px solid var(--border);
+            border-radius: 20px;
+            background: var(--card);
+            color: var(--ink-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tag:hover:not(.active) {
+            border-color: var(--ink);
+            color: var(--ink);
         }
         .tag.active {
-            background-color: #1a0dab;
+            background: var(--tag-active-bg);
+            color: var(--tag-active-fg);
+            border-color: var(--tag-active-bg);
+        }
+        .tag.sensitive { border-color: #e07b54; color: #c0522a; }
+        .tag.sensitive.active { background: #c0522a; border-color: #c0522a; color: #fff; }
+
+        .sort-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 24px 12px;
+            flex-wrap: wrap;
+        }
+        #sort-btn.active {
+            background: var(--ink);
             color: #fff;
-            border-color: #1a0dab;
+            border-color: var(--ink);
         }
-        .sort-btn {
-            background-color: #f8f9fa;
-            font-weight: bold;
+        .result-count {
+            font-size: 0.8rem;
+            color: var(--ink-faint);
+            margin-left: auto;
         }
-        .sort-btn.active {
-            background-color: #1a0dab;
-            color: #fff;
-            border-color: #1a0dab;
-        }
-        .news-count-select {
-            background-color: #f8f9fa;
-            appearance: menulist;
-            -webkit-appearance: menulist;
-            -moz-appearance: menulist;
-        }
-        .news-container {
+
+        /* ── News container ─────────────────────── */
+        #news {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 8px 24px 0;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
         }
+
+        /* ── News card ──────────────────────────── */
         .news-item {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 22px;
+            box-shadow: var(--shadow);
+            transition: transform 0.18s, box-shadow 0.18s;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 4px 16px;
+            align-items: start;
         }
         .news-item:hover {
             transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
         }
-        .news-title {
-            font-size: 1.2em;
-            margin: 0 0 10px;
-            color: #1a0dab;
+        .news-item-body { grid-column: 1; }
+        .news-item-meta {
+            grid-column: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
         }
         .news-source {
-            color: #555;
-            font-size: 0.9em;
-            margin: 0 0 5px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--accent);
         }
         .news-date {
-            color: #777;
-            font-size: 0.85em;
-            margin: 0 0 10px;
+            font-size: 0.75rem;
+            color: var(--ink-faint);
+        }
+        .news-dot { color: var(--border); font-size: 0.6rem; }
+        .news-title {
+            font-family: var(--font-head);
+            font-size: 1.12rem;
+            line-height: 1.4;
+            color: var(--ink);
+            margin-bottom: 8px;
+        }
+        .news-desc {
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: var(--ink-muted);
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
         .news-link {
-            color: #1a0dab;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--ink);
             text-decoration: none;
-            font-weight: bold;
+            border-bottom: 1.5px solid var(--border);
+            transition: color 0.15s, border-color 0.15s;
         }
-        .news-link:hover {
-            text-decoration: underline;
-        }
-        .error {
-            color: red;
+        .news-link:hover { color: var(--accent); border-color: var(--accent); }
+        .news-link-arrow { font-size: 0.75rem; transition: transform 0.15s; }
+        .news-link:hover .news-link-arrow { transform: translateX(3px); }
+
+        /* ── Status messages ────────────────────── */
+        .status-msg {
             text-align: center;
-            font-size: 1.1em;
+            padding: 48px 24px;
+            color: var(--ink-muted);
+            font-size: 1rem;
         }
-        .loading {
-            text-align: center;
-            font-size: 1.1em;
-            color: #333;
+        .status-msg.error { color: var(--accent); }
+        .status-msg .icon { font-size: 2rem; display: block; margin-bottom: 10px; }
+
+        /* ── Loading skeleton ───────────────────── */
+        .skeleton {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 22px;
         }
-        /* Modal styles for content warning */
+        .skeleton-line {
+            height: 12px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #eee 25%, #f8f8f8 50%, #eee 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            margin-bottom: 10px;
+        }
+        .skeleton-line.wide { width: 90%; }
+        .skeleton-line.med  { width: 60%; }
+        .skeleton-line.short{ width: 35%; height: 10px; }
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ── Modal ──────────────────────────────── */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            inset: 0;
+            background: rgba(26,26,46,0.55);
             z-index: 1000;
             justify-content: center;
             align-items: center;
+            backdrop-filter: blur(2px);
         }
         .modal-content {
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 400px;
+            background: var(--card);
+            padding: 28px 28px 22px;
+            border-radius: 14px;
+            max-width: 380px;
+            width: calc(100% - 40px);
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 60px rgba(26,26,46,0.25);
+        }
+        .modal-icon { font-size: 2rem; margin-bottom: 12px; }
+        .modal-content h3 {
+            font-family: var(--font-head);
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--ink);
         }
         .modal-content p {
-            margin: 0 0 20px;
-            font-size: 1.1em;
-            color: #333;
+            font-size: 0.9rem;
+            color: var(--ink-muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
         }
-        .modal-content button {
-            padding: 8px 16px;
-            margin: 0 10px;
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .btn-accept, .btn-cancel {
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 9px 20px;
+            border-radius: 7px;
             border: none;
-            border-radius: 4px;
             cursor: pointer;
-            font-size: 1em;
+            transition: opacity 0.15s;
         }
-        .modal-content .accept-btn {
-            background-color: #1a0dab;
-            color: #fff;
-        }
-        .modal-content .accept-btn:hover {
-            background-color: #0d47a1;
-        }
-        .modal-content .cancel-btn {
-            background-color: #ccc;
-            color: #333;
-        }
-        .modal-content .cancel-btn:hover {
-            background-color: #bbb;
+        .btn-accept { background: var(--ink); color: #fff; }
+        .btn-accept:hover { opacity: 0.85; }
+        .btn-cancel { background: var(--border); color: var(--ink); }
+        .btn-cancel:hover { opacity: 0.75; }
+
+        @media (max-width: 600px) {
+            .controls-bar { padding: 12px 16px; }
+            #news { padding: 8px 16px 0; }
+            .tags-bar, .sort-row { padding-left: 16px; padding-right: 16px; }
         }
     </style>
 </head>
 <body>
+
+<header>
     <h1>Latest Google News</h1>
-    <div class="controls">
-        <div>
-            <label for="language-select">Language: </label>
-            <select id="language-select">
-                <option value="en|US" selected>English</option>
-                <option value="fr|FR">French</option>
-                <option value="es|ES">Spanish</option>
-                <option value="de|DE">German</option>
-                <option value="it|IT">Italian</option>
-            </select>
-        </div>
-        <div>
-            <label for="location-search">Location: </label>
-            <input type="text" id="location-search" placeholder="e.g., New York">
-        </div>
-        <button id="refresh-btn">Refresh News</button>
+    <p class="subtitle">Powered by Google News RSS</p>
+</header>
+
+<div class="controls-bar">
+    <div class="controls-group">
+        <label for="language-select">Language</label>
+        <select id="language-select">
+            <option value="en|US" selected>English (US)</option>
+            <option value="fr|FR">French</option>
+            <option value="es|ES">Spanish</option>
+            <option value="de|DE">German</option>
+            <option value="it|IT">Italian</option>
+        </select>
     </div>
-    <div class="tags">
-        <button id="sort-btn" class="sort-btn">Sort: Newest First</button>
-        <select id="news-count" class="news-count-select">
+    <div class="controls-group">
+        <label for="location-search">Location</label>
+        <input type="text" id="location-search" placeholder="e.g. New York" autocomplete="off">
+    </div>
+    <div class="controls-group">
+        <label for="news-count">Show</label>
+        <select id="news-count">
             <option value="5">5</option>
             <option value="10" selected>10</option>
             <option value="15">15</option>
             <option value="20">20</option>
         </select>
-        <button class="tag active" data-topic="all">All</button>
-        <button class="tag" data-topic="technology">Technology</button>
-        <button class="tag" data-topic="sports">Sports</button>
-        <button class="tag" data-topic="business">Business</button>
-        <button class="tag" data-topic="entertainment">Entertainment</button>
-        <button class="tag" data-topic="world">World</button>
-        <button class="tag" data-topic="death">Death</button>
-        <button class="tag" data-topic="accident">Accident</button>
     </div>
-    <div id="news" class="news-container">
-        <p class="loading">Loading news...</p>
-    </div>
-    <!-- Content Warning Modal -->
-    <div id="content-warning" class="modal">
-        <div class="modal-content">
-            <p>Warning: News about "<span id="warning-topic"></span>" may contain distressing or sensitive content. Proceed?</p>
-            <button class="accept-btn" id="accept-warning">Continue</button>
-            <button class="cancel-btn" id="cancel-btn">Cancel</button>
+    <button type="button" id="refresh-btn">↻ Refresh</button>
+</div>
+
+<div class="tags-bar">
+    <button type="button" class="tag active" data-topic="all">All</button>
+    <button type="button" class="tag" data-topic="technology">Technology</button>
+    <button type="button" class="tag" data-topic="sports">Sports</button>
+    <button type="button" class="tag" data-topic="business">Business</button>
+    <button type="button" class="tag" data-topic="entertainment">Entertainment</button>
+    <button type="button" class="tag" data-topic="world">World</button>
+    <button type="button" class="tag sensitive" data-topic="death">Death</button>
+    <button type="button" class="tag sensitive" data-topic="accident">Accident</button>
+</div>
+
+<div class="sort-row">
+    <!-- FIX 4: sort-btn starts with .active since newest-first IS the active/default state -->
+    <button type="button" id="sort-btn" class="active">↓ Newest First</button>
+    <span class="result-count" id="result-count"></span>
+</div>
+
+<div id="news"></div>
+
+<!-- Content Warning Modal -->
+<div id="content-warning" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-content">
+        <div class="modal-icon">⚠️</div>
+        <h3 id="modal-title">Sensitive Content</h3>
+        <p>News about "<strong id="warning-topic"></strong>" may contain distressing or upsetting content. Do you want to continue?</p>
+        <div class="modal-actions">
+            <button type="button" class="btn-accept" id="accept-warning">Continue</button>
+            <button type="button" class="btn-cancel" id="cancel-btn">Cancel</button>
         </div>
     </div>
+</div>
 
-    <script>
-        // Track warnings shown in session
-        const shownWarnings = {
-            death: sessionStorage.getItem('warning-death') === 'true',
-            accident: sessionStorage.getItem('warning-accident') === 'true'
-        };
+<script>
+    // ── Session warning state ──────────────────────────────────────
+    const shownWarnings = {
+        death:    sessionStorage.getItem('warning-death')    === 'true',
+        accident: sessionStorage.getItem('warning-accident') === 'true'
+    };
 
-        // Default sort order: descending (newest first)
-        let isSortDescending = true;
+    // FIX 1: isSortDescending controls sort order properly
+    let isSortDescending = true;
 
-        async function fetchWithRetry(url, retries = 2, delay = 1000) {
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url);
-                    if (response.ok) return response;
-                    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
-                } catch (error) {
-                    console.warn(`Retry ${i + 1}/${retries} for ${url}: ${error.message}`);
-                    if (i < retries - 1) {
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        continue;
-                    }
-                    throw error;
-                }
-            }
-        }
+    // ── Helpers ────────────────────────────────────────────────────
 
-        async function fetchNews() {
-            const newsContainer = document.getElementById('news');
-            const newsCount = parseInt(document.getElementById('news-count').value);
-            const refreshBtn = document.getElementById('refresh-btn');
-            const sortBtn = document.getElementById('sort-btn');
-            const languageSelect = document.getElementById('language-select');
-            const newsCountSelect = document.getElementById('news-count');
-            const activeTag = document.querySelector('.tag.active');
-            const topic = activeTag.dataset.topic;
-            const location = document.getElementById('location-search').value.trim();
-            const [language, region] = languageSelect.value.split('|');
+    /** Escape HTML to prevent XSS from untrusted RSS content (FIX 3) */
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
-            // Disable buttons during fetch
-            refreshBtn.disabled = true;
-            sortBtn.disabled = true;
-            languageSelect.disabled = true;
-            newsCountSelect.disabled = true;
-            newsContainer.innerHTML = '<p class="loading">Loading news...</p>';
+    /** Strip all HTML tags from a string (FIX 9: Google RSS descriptions contain HTML) */
+    function stripTags(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return (tmp.textContent || tmp.innerText || '').trim();
+    }
 
+    /** Retry-capable fetch */
+    async function fetchWithRetry(url, retries = 2, delay = 1000) {
+        for (let i = 0; i < retries; i++) {
             try {
-                // Log request details
-                const requestDetails = { 
-                    topic, 
-                    location, 
-                    newsCount, 
-                    sortOrder: isSortDescending ? 'descending (newest first)' : 'ascending (oldest first)', 
-                    language, 
-                    region, 
-                    timestamp: new Date().toLocaleString('en-US', { timeZone: 'UTC' })
-                };
-                console.log('Fetching news with details:', requestDetails);
-
-                // Construct RSS URL with language and region parameters
-                const baseUrl = 'https://news.google.com/rss';
-                let query = topic === 'all' ? '' : topic;
-                if (location) {
-                    query = query ? `${query}+in+${location}` : `in+${location}`;
+                const res = await fetch(url);
+                if (res.ok) return res;
+                throw new Error(`HTTP ${res.status} ${res.statusText}`);
+            } catch (err) {
+                if (i < retries - 1) {
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
                 }
-                const rssUrl = query 
-                    ? `${baseUrl}/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`
-                    : `${baseUrl}?hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`;
-                console.log('Request URL:', rssUrl);
-
-                // Fetch with retry
-                const response = await fetchWithRetry('https://corsproxy.io/?' + encodeURIComponent(rssUrl));
-                const text = await response.text();
-
-                // Parse XML
-                const parser = new DOMParser();
-                const xml = parser.parseFromString(text, 'text/xml');
-                if (xml.querySelector('parsererror')) {
-                    throw new Error('Failed to parse RSS feed XML');
-                }
-
-                const items = Array.from(xml.querySelectorAll('item'));
-                console.log(`Found ${items.length} news items`);
-
-                // Sort items by pubDate (default: newest first)
-                items.sort((a, b) => {
-                    const dateA = new Date(a.querySelector('pubDate')?.textContent || 0);
-                    const dateB = new Date(b.querySelector('pubDate')?.textContent || 0);
-                    return isSortDescending ? dateB - dateA : dateB - dateA;
-                });
-
-                // Clear loading message
-                newsContainer.innerHTML = '';
-
-                // Display articles
-                items.slice(0, newsCount).forEach((item, index) => {
-                    const title = item.querySelector('title')?.textContent || 'No title';
-                    const link = item.querySelector('link')?.textContent || '#';
-                    const pubDate = item.querySelector('pubDate')?.textContent || 'No date';
-                    const source = item.querySelector('source')?.textContent || 'Unknown Source';
-
-                    // Log article details
-                    console.log(`Article ${index + 1}:`, { title, source, pubDate, link });
-
-                    // Format date
-                    const date = pubDate !== 'No date' ? new Date(pubDate).toLocaleString() : 'Unknown date';
-
-                    // Create news item element
-                    const newsItem = document.createElement('div');
-                    newsItem.className = 'news-item';
-                    newsItem.innerHTML = `
-                        <h2 class="news-title">${title}</h2>
-                        <p class="news-source">Source: ${source}</p>
-                        <p class="news-date">Published: ${date}</p>
-                        <a href="${link}" target="_blank" class="news-link">Read more</a>
-                    `;
-                    newsContainer.appendChild(newsItem);
-                });
-
-                // Handle empty results
-                if (items.length === 0) {
-                    const errorMsg = location 
-                        ? `No news articles found for ${topic} in ${location} (${languageSelect.options[languageSelect.selectedIndex].text}).` 
-                        : `No news articles found for ${topic} (${languageSelect.options[languageSelect.selectedIndex].text}).`;
-                    newsContainer.innerHTML = `<p class="error">${errorMsg}</p>`;
-                    console.warn('No articles found:', { topic, location, language, region });
-                }
-            } catch (error) {
-                // Detailed error handling
-                let errorMsg = 'Failed to load news. Please try again later.';
-                if (error.message.includes('HTTP error')) {
-                    errorMsg = `Failed to fetch news due to server error: ${error.message}. Try refreshing or checking your connection.`;
-                } else if (error.message.includes('parse RSS feed')) {
-                    errorMsg = 'Failed to parse news feed. The feed may be invalid or unavailable.';
-                } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                    errorMsg = 'Network error: Unable to connect to the news server. Check your internet connection.';
-                }
-
-                // Log detailed error
-                console.error('Error fetching news:', {
-                    message: error.message,
-                    stack: error.stack,
-                    requestDetails,
-                    responseText: error.responseText || 'N/A'
-                });
-
-                newsContainer.innerHTML = `<p class="error">${errorMsg}</p>`;
-            } finally {
-                // Re-enable buttons
-                refreshBtn.disabled = false;
-                sortBtn.disabled = false;
-                languageSelect.disabled = false;
-                newsCountSelect.disabled = false;
+                throw err;
             }
         }
+    }
 
-        // Show content warning for sensitive topics
-        function showContentWarning(topic, onAccept) {
-            if (shownWarnings[topic]) {
-                onAccept();
-                return;
+    /** Show skeleton loading cards */
+    function showSkeleton(count = 5) {
+        const container = document.getElementById('news');
+        container.innerHTML = Array.from({ length: count }, () => `
+            <div class="skeleton">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line wide" style="height:16px; margin-bottom:12px;"></div>
+                <div class="skeleton-line med"></div>
+            </div>
+        `).join('');
+    }
+
+    // ── Main fetch ─────────────────────────────────────────────────
+    async function fetchNews() {
+        const newsContainer  = document.getElementById('news');
+        const resultCount    = document.getElementById('result-count');
+        const newsCount      = parseInt(document.getElementById('news-count').value);
+        const refreshBtn     = document.getElementById('refresh-btn');
+        const sortBtn        = document.getElementById('sort-btn');
+        const languageSelect = document.getElementById('language-select');
+        const newsCountSel   = document.getElementById('news-count');
+        const topic          = document.querySelector('.tag.active').dataset.topic;
+        const location       = document.getElementById('location-search').value.trim();
+        const [language, region] = languageSelect.value.split('|');
+
+        // FIX 2: Declare requestDetails BEFORE try so catch can reference it
+        let requestDetails = { topic, location, newsCount, language, region };
+
+        // Disable controls during fetch
+        [refreshBtn, sortBtn, languageSelect, newsCountSel].forEach(el => el.disabled = true);
+        resultCount.textContent = '';
+        showSkeleton(3);
+
+        try {
+            // Build RSS URL
+            const baseUrl = 'https://news.google.com/rss';
+            let query = topic === 'all' ? '' : topic;
+            if (location) {
+                query = query ? `${query} in ${location}` : `in ${location}`;
             }
+            const rssUrl = query
+                ? `${baseUrl}/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`
+                : `${baseUrl}?hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`;
 
-            const modal = document.getElementById('content-warning');
-            const warningTopic = document.getElementById('warning-topic');
-            const acceptBtn = document.getElementById('accept-warning');
-            const cancelBtn = document.getElementById('cancel-btn');
+            requestDetails.url = rssUrl;
+            console.log('Fetching news:', requestDetails);
 
-            console.log(`Showing content warning for ${topic}`);
-            warningTopic.textContent = topic.charAt(0).toUpperCase() + topic.slice(1);
-            modal.style.display = 'flex';
+            const response = await fetchWithRetry('https://corsproxy.io/?' + encodeURIComponent(rssUrl));
+            const text     = await response.text();
 
-            // Handle accept
-            const acceptHandler = () => {
-                console.log(`User accepted warning for ${topic}`);
-                shownWarnings[topic] = true;
-                sessionStorage.setItem(`warning-${topic}`, 'true');
-                modal.style.display = 'none';
-                acceptBtn.removeEventListener('click', acceptHandler);
-                cancelBtn.removeEventListener('click', cancelHandler);
-                onAccept();
-            };
+            const parser = new DOMParser();
+            const xml    = parser.parseFromString(text, 'text/xml');
+            if (xml.querySelector('parsererror')) throw new Error('RSS feed parse error');
 
-            // Handle cancel
-            const cancelHandler = () => {
-                console.log(`User cancelled warning for ${topic}, reverting to 'all'`);
-                document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
-                document.querySelector('.tag[data-topic="all"]').classList.add('active');
-                modal.style.display = 'none';
-                acceptBtn.removeEventListener('click', acceptHandler);
-                cancelBtn.removeEventListener('click', cancelHandler);
-                fetchNews();
-            };
+            const items = Array.from(xml.querySelectorAll('item'));
 
-            acceptBtn.addEventListener('click', acceptHandler);
-            cancelBtn.addEventListener('click', cancelHandler);
-        }
-
-        // Event listeners for tags
-        document.querySelectorAll('.tag').forEach(tag => {
-            tag.addEventListener('click', () => {
-                const topic = tag.dataset.topic;
-                document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
-                tag.classList.add('active');
-
-                // Check for sensitive topics
-                if (topic === 'death' || topic === 'accident') {
-                    showContentWarning(topic, fetchNews);
-                } else {
-                    fetchNews();
-                }
+            // FIX 1: FIXED sort — ascending branch now correctly uses dateA - dateB
+            items.sort((a, b) => {
+                const dateA = new Date(a.querySelector('pubDate')?.textContent || 0);
+                const dateB = new Date(b.querySelector('pubDate')?.textContent || 0);
+                return isSortDescending ? dateB - dateA : dateA - dateB; // ← was dateB - dateA both ways
             });
-        });
 
-        // Event listeners for refresh, news count, location input, language select, and sort
-        document.getElementById('refresh-btn').addEventListener('click', () => {
-            const activeTopic = document.querySelector('.tag.active').dataset.topic;
-            if (activeTopic === 'death' || activeTopic === 'accident') {
-                showContentWarning(activeTopic, fetchNews);
-            } else {
-                fetchNews();
+            newsContainer.innerHTML = '';
+
+            const visible = items.slice(0, newsCount);
+
+            // FIX 8: Show result count
+            if (items.length > 0) {
+                resultCount.textContent = `Showing ${visible.length} of ${items.length} articles`;
             }
-        });
-        document.getElementById('news-count').addEventListener('change', () => {
-            console.log(`Number of articles changed to: ${document.getElementById('news-count').value}`);
-            fetchNews();
-        });
-        document.getElementById('location-search').addEventListener('input', () => {
-            clearTimeout(window.searchTimeout);
-            window.searchTimeout = setTimeout(fetchNews, 300);
-        });
-        document.getElementById('language-select').addEventListener('change', () => {
-            const [language, region] = document.getElementById('language-select').value.split('|');
-            console.log(`Language changed to: ${language}, region: ${region}`);
-            fetchNews();
-        });
-        document.getElementById('sort-btn').addEventListener('click', () => {
-            isSortDescending = !isSortDescending;
-            const sortBtn = document.getElementById('sort-btn');
-            sortBtn.textContent = `Sort: ${isSortDescending ? 'Newest First' : 'Oldest First'}`;
-            sortBtn.classList.toggle('active');
-            console.log(`Sort order changed to: ${isSortDescending ? 'descending (newest first)' : 'ascending (oldest first)'}`);
-            fetchNews();
-        });
 
-        // Log default sort order and language on load
-        console.log('Page loaded with default sort order: descending (newest first), language: en, region: US');
+            visible.forEach((item, i) => {
+                const rawTitle = item.querySelector('title')?.textContent       || 'No title';
+                const link     = item.querySelector('link')?.textContent        || '#';
+                const pubDate  = item.querySelector('pubDate')?.textContent     || '';
+                const rawSrc   = item.querySelector('source')?.textContent      || 'Unknown Source';
+                // FIX 5: Extract description; FIX 9: strip HTML tags from it
+                const rawDesc  = item.querySelector('description')?.textContent || '';
+                const desc     = stripTags(rawDesc);
 
-        // Fetch news when page loads
-        window.onload = fetchNews;
-    </script>
+                const date = pubDate ? new Date(pubDate).toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                }) : 'Unknown date';
+
+                // FIX 3: Escape all user-facing strings before using innerHTML
+                const title  = escapeHtml(rawTitle);
+                const source = escapeHtml(rawSrc);
+                const safeDesc = escapeHtml(desc);
+
+                const card = document.createElement('article');
+                card.className = 'news-item';
+                card.style.animationDelay = `${i * 40}ms`;
+                card.innerHTML = `
+                    <div class="news-item-body">
+                        <div class="news-item-meta">
+                            <span class="news-source">${source}</span>
+                            <span class="news-dot">●</span>
+                            <span class="news-date">${date}</span>
+                        </div>
+                        <h2 class="news-title">${title}</h2>
+                        ${safeDesc ? `<p class="news-desc">${safeDesc}</p>` : ''}
+                        <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="news-link">
+                            Read article <span class="news-link-arrow">→</span>
+                        </a>
+                    </div>
+                `;
+                newsContainer.appendChild(card);
+            });
+
+            if (items.length === 0) {
+                newsContainer.innerHTML = `
+                    <div class="status-msg">
+                        <span class="icon">🔍</span>
+                        No articles found for <strong>${escapeHtml(topic)}</strong>${location ? ` in <strong>${escapeHtml(location)}</strong>` : ''}.
+                    </div>`;
+            }
+
+        } catch (err) {
+            // FIX 2 (cont.): requestDetails is now always in scope
+            console.error('Fetch failed:', { error: err.message, ...requestDetails });
+
+            let msg = 'Failed to load news. Please try again.';
+            if (err.message.includes('HTTP'))          msg = `Server error: ${err.message}. Try refreshing.`;
+            else if (err.message.includes('parse'))    msg = 'Could not parse the news feed. It may be temporarily unavailable.';
+            else if (err.name === 'TypeError')         msg = 'Network error: check your internet connection.';
+
+            newsContainer.innerHTML = `<div class="status-msg error"><span class="icon">⚠️</span>${escapeHtml(msg)}</div>`;
+            resultCount.textContent = '';
+        } finally {
+            [refreshBtn, sortBtn, languageSelect, newsCountSel].forEach(el => el.disabled = false);
+        }
+    }
+
+    // ── Content warning modal ──────────────────────────────────────
+    function showContentWarning(topic, onAccept) {
+        if (shownWarnings[topic]) { onAccept(); return; }
+
+        const modal     = document.getElementById('content-warning');
+        const topicSpan = document.getElementById('warning-topic');
+        const acceptBtn = document.getElementById('accept-warning');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        topicSpan.textContent = topic.charAt(0).toUpperCase() + topic.slice(1);
+        modal.style.display = 'flex';
+
+        function cleanup() {
+            modal.style.display = 'none';
+            acceptBtn.removeEventListener('click', handleAccept);
+            cancelBtn.removeEventListener('click', handleCancel);
+        }
+        function handleAccept() {
+            shownWarnings[topic] = true;
+            sessionStorage.setItem(`warning-${topic}`, 'true');
+            cleanup();
+            onAccept();
+        }
+        function handleCancel() {
+            document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tag[data-topic="all"]').classList.add('active');
+            cleanup();
+            fetchNews();
+        }
+
+        acceptBtn.addEventListener('click', handleAccept);
+        cancelBtn.addEventListener('click', handleCancel);
+    }
+
+    // ── Event wiring ───────────────────────────────────────────────
+
+    document.querySelectorAll('.tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+            document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+            tag.classList.add('active');
+            const t = tag.dataset.topic;
+            (t === 'death' || t === 'accident') ? showContentWarning(t, fetchNews) : fetchNews();
+        });
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+        const t = document.querySelector('.tag.active').dataset.topic;
+        (t === 'death' || t === 'accident') ? showContentWarning(t, fetchNews) : fetchNews();
+    });
+
+    document.getElementById('news-count').addEventListener('change', fetchNews);
+
+    document.getElementById('language-select').addEventListener('change', fetchNews);
+
+    // FIX 6: Debounce 600ms, only fire when ≥3 chars or completely empty
+    document.getElementById('location-search').addEventListener('input', function () {
+        clearTimeout(window.searchTimeout);
+        const val = this.value.trim();
+        if (val === '' || val.length >= 3) {
+            window.searchTimeout = setTimeout(fetchNews, 600);
+        }
+    });
+
+    document.getElementById('sort-btn').addEventListener('click', () => {
+        isSortDescending = !isSortDescending;
+        const btn = document.getElementById('sort-btn');
+        btn.textContent = isSortDescending ? '↓ Newest First' : '↑ Oldest First';
+        btn.classList.toggle('active', isSortDescending);
+        fetchNews();
+    });
+
+    // Initial load
+    fetchNews();
+</script>
 </body>
 </html>
