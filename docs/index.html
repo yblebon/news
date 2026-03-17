@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Latest Google News</title>
+    <title>Latest News</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -344,12 +344,20 @@
 <body>
 
 <header>
-    <h1>Latest Google News</h1>
-    <p class="subtitle">Powered by Google News RSS</p>
+    <h1>Latest News</h1>
+    <p class="subtitle" id="header-subtitle">Powered by Google News RSS</p>
 </header>
 
 <div class="controls-bar">
     <div class="controls-group">
+        <label for="source-select">Source</label>
+        <select id="source-select">
+            <option value="google" selected>Google News</option>
+            <option value="bbc">BBC News</option>
+            <option value="guardian">The Guardian</option>
+        </select>
+    </div>
+    <div class="controls-group" id="language-group">
         <label for="language-select">Language</label>
         <select id="language-select">
             <option value="en|US" selected>English (US)</option>
@@ -359,7 +367,7 @@
             <option value="it|IT">Italian</option>
         </select>
     </div>
-    <div class="controls-group">
+    <div class="controls-group" id="location-group">
         <label for="location-search">Location</label>
         <input type="text" id="location-search" placeholder="e.g. New York" autocomplete="off">
     </div>
@@ -406,6 +414,63 @@
 </div>
 
 <script>
+    // ── News source definitions ────────────────────────────────────
+    const SOURCES = {
+        google: {
+            label: 'Powered by Google News RSS',
+            supportsLanguage: true,
+            supportsLocation: true,
+            supportsTopics: true,
+            buildUrl(topic, location, language, region) {
+                const base = 'https://news.google.com/rss';
+                let query = topic === 'all' ? '' : topic;
+                if (location) query = query ? `${query} in ${location}` : `in ${location}`;
+                return query
+                    ? `${base}/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`
+                    : `${base}?hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`;
+            }
+        },
+        bbc: {
+            label: 'Powered by BBC News RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // BBC has per-section feeds; search topics map to known feeds
+            topicFeeds: {
+                all:           'https://feeds.bbci.co.uk/news/rss.xml',
+                technology:    'https://feeds.bbci.co.uk/news/technology/rss.xml',
+                sports:        'https://feeds.bbci.co.uk/sport/rss.xml',
+                business:      'https://feeds.bbci.co.uk/news/business/rss.xml',
+                entertainment: 'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml',
+                world:         'https://feeds.bbci.co.uk/news/world/rss.xml',
+                death:         'https://feeds.bbci.co.uk/news/rss.xml',
+                accident:      'https://feeds.bbci.co.uk/news/rss.xml',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        guardian: {
+            label: 'Powered by The Guardian RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            topicFeeds: {
+                all:           'https://www.theguardian.com/world/rss',
+                technology:    'https://www.theguardian.com/technology/rss',
+                sports:        'https://www.theguardian.com/sport/rss',
+                business:      'https://www.theguardian.com/business/rss',
+                entertainment: 'https://www.theguardian.com/culture/rss',
+                world:         'https://www.theguardian.com/world/rss',
+                death:         'https://www.theguardian.com/world/rss',
+                accident:      'https://www.theguardian.com/world/rss',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        }
+    };
+
     const shownWarnings = {
         death:    sessionStorage.getItem('warning-death')    === 'true',
         accident: sessionStorage.getItem('warning-accident') === 'true'
@@ -418,7 +483,6 @@
     const PROXIES = [
         url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
         url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        url => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
     ];
 
     function escapeHtml(str) {
@@ -436,24 +500,27 @@
         return (tmp.textContent || tmp.innerText || '').trim();
     }
 
-    /** Try each proxy in turn; resolve with the first successful text response */
-    async function fetchRSS(rssUrl) {
+    /** Try each proxy in turn; resolve with the first successful text response.
+     *  If directFirst=true, attempt the raw URL first (for CORS-open sources). */
+    async function fetchRSS(rssUrl, directFirst = false) {
         let lastError;
-        for (const makeProxy of PROXIES) {
+        const attempts = directFirst
+            ? [url => url, ...PROXIES]
+            : PROXIES;
+        for (const makeProxy of attempts) {
             const proxyUrl = makeProxy(rssUrl);
             try {
                 const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const text = await res.text();
-                // Sanity-check: must look like XML/RSS
                 if (!text.trim().startsWith('<')) throw new Error('Response is not XML');
                 return text;
             } catch (err) {
-                console.warn(`Proxy failed (${proxyUrl}):`, err.message);
+                console.warn(`Attempt failed (${proxyUrl}):`, err.message);
                 lastError = err;
             }
         }
-        throw lastError || new Error('All proxies failed');
+        throw lastError || new Error('All fetch attempts failed');
     }
 
     function showSkeleton(count = 5) {
@@ -475,30 +542,35 @@
         const sortBtn        = document.getElementById('sort-btn');
         const languageSelect = document.getElementById('language-select');
         const newsCountSel   = document.getElementById('news-count');
+        const sourceSelect   = document.getElementById('source-select');
         const topic          = document.querySelector('.tag.active').dataset.topic;
         const location       = document.getElementById('location-search').value.trim();
         const [language, region] = languageSelect.value.split('|');
+        const sourceKey      = sourceSelect.value;
+        const source         = SOURCES[sourceKey];
 
-        let requestDetails = { topic, location, newsCount, language, region };
+        // Update header subtitle
+        document.getElementById('header-subtitle').textContent = source.label;
 
-        [refreshBtn, sortBtn, languageSelect, newsCountSel].forEach(el => el.disabled = true);
+        // Show/hide language & location controls based on source capabilities
+        document.getElementById('language-group').style.display  = source.supportsLanguage  ? '' : 'none';
+        document.getElementById('location-group').style.display  = source.supportsLocation  ? '' : 'none';
+
+        let requestDetails = { sourceKey, topic, location, newsCount, language, region };
+
+        [refreshBtn, sortBtn, languageSelect, newsCountSel, sourceSelect].forEach(el => el.disabled = true);
         resultCount.textContent = '';
         showSkeleton(3);
 
         try {
-            const baseUrl = 'https://news.google.com/rss';
-            let query = topic === 'all' ? '' : topic;
-            if (location) {
-                query = query ? `${query} in ${location}` : `in ${location}`;
-            }
-            const rssUrl = query
-                ? `${baseUrl}/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`
-                : `${baseUrl}?hl=${encodeURIComponent(language)}&gl=${encodeURIComponent(region)}`;
+            const rssUrl = source.buildUrl(topic, location, language, region);
+            // BBC is CORS-open; try direct first. Google & Guardian need proxies.
+            const directFirst = sourceKey === 'bbc';
 
             requestDetails.url = rssUrl;
             console.log('Fetching news:', requestDetails);
 
-            const text = await fetchRSS(rssUrl);
+            const text = await fetchRSS(rssUrl, directFirst);
 
             const parser = new DOMParser();
             const xml    = parser.parseFromString(text, 'text/xml');
@@ -575,7 +647,7 @@
             newsContainer.innerHTML = `<div class="status-msg error"><span class="icon">⚠️</span>${escapeHtml(msg)}</div>`;
             resultCount.textContent = '';
         } finally {
-            [refreshBtn, sortBtn, languageSelect, newsCountSel].forEach(el => el.disabled = false);
+            [refreshBtn, sortBtn, languageSelect, newsCountSel, sourceSelect].forEach(el => el.disabled = false);
         }
     }
 
@@ -626,6 +698,7 @@
         (t === 'death' || t === 'accident') ? showContentWarning(t, fetchNews) : fetchNews();
     });
 
+    document.getElementById('source-select').addEventListener('change', fetchNews);
     document.getElementById('news-count').addEventListener('change', fetchNews);
     document.getElementById('language-select').addEventListener('change', fetchNews);
 
