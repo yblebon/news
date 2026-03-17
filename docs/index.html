@@ -35,7 +35,6 @@
             padding: 0 0 60px;
         }
 
-        /* ── Header ─────────────────────────────── */
         header {
             background: var(--ink);
             color: #fff;
@@ -57,7 +56,6 @@
             text-transform: uppercase;
         }
 
-        /* ── Controls bar ───────────────────────── */
         .controls-bar {
             background: var(--card);
             border-bottom: 1px solid var(--border);
@@ -132,7 +130,6 @@
             border-color: var(--accent-hover);
         }
 
-        /* ── Tags ───────────────────────────────── */
         .tags-bar {
             padding: 14px 24px;
             display: flex;
@@ -181,7 +178,6 @@
             margin-left: auto;
         }
 
-        /* ── News container ─────────────────────── */
         #news {
             max-width: 860px;
             margin: 0 auto;
@@ -191,7 +187,6 @@
             gap: 16px;
         }
 
-        /* ── News card ──────────────────────────── */
         .news-item {
             background: var(--card);
             border: 1px solid var(--border);
@@ -260,7 +255,6 @@
         .news-link-arrow { font-size: 0.75rem; transition: transform 0.15s; }
         .news-link:hover .news-link-arrow { transform: translateX(3px); }
 
-        /* ── Status messages ────────────────────── */
         .status-msg {
             text-align: center;
             padding: 48px 24px;
@@ -270,7 +264,6 @@
         .status-msg.error { color: var(--accent); }
         .status-msg .icon { font-size: 2rem; display: block; margin-bottom: 10px; }
 
-        /* ── Loading skeleton ───────────────────── */
         .skeleton {
             background: var(--card);
             border: 1px solid var(--border);
@@ -293,7 +286,6 @@
             100% { background-position: -200% 0; }
         }
 
-        /* ── Modal ──────────────────────────────── */
         .modal {
             display: none;
             position: fixed;
@@ -395,14 +387,12 @@
 </div>
 
 <div class="sort-row">
-    <!-- FIX 4: sort-btn starts with .active since newest-first IS the active/default state -->
     <button type="button" id="sort-btn" class="active">↓ Newest First</button>
     <span class="result-count" id="result-count"></span>
 </div>
 
 <div id="news"></div>
 
-<!-- Content Warning Modal -->
 <div id="content-warning" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content">
         <div class="modal-icon">⚠️</div>
@@ -416,18 +406,21 @@
 </div>
 
 <script>
-    // ── Session warning state ──────────────────────────────────────
     const shownWarnings = {
         death:    sessionStorage.getItem('warning-death')    === 'true',
         accident: sessionStorage.getItem('warning-accident') === 'true'
     };
 
-    // FIX 1: isSortDescending controls sort order properly
     let isSortDescending = true;
 
-    // ── Helpers ────────────────────────────────────────────────────
+    // ── CORS proxies to try in order ───────────────────────────────
+    // allorigins wraps JSON; use /raw?url= to get the raw RSS text directly
+    const PROXIES = [
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
+    ];
 
-    /** Escape HTML to prevent XSS from untrusted RSS content (FIX 3) */
     function escapeHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;')
@@ -437,31 +430,32 @@
             .replace(/'/g, '&#39;');
     }
 
-    /** Strip all HTML tags from a string (FIX 9: Google RSS descriptions contain HTML) */
     function stripTags(html) {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         return (tmp.textContent || tmp.innerText || '').trim();
     }
 
-    /** Retry-capable fetch */
-    async function fetchWithRetry(url, retries = 2, delay = 1000) {
-        for (let i = 0; i < retries; i++) {
+    /** Try each proxy in turn; resolve with the first successful text response */
+    async function fetchRSS(rssUrl) {
+        let lastError;
+        for (const makeProxy of PROXIES) {
+            const proxyUrl = makeProxy(rssUrl);
             try {
-                const res = await fetch(url);
-                if (res.ok) return res;
-                throw new Error(`HTTP ${res.status} ${res.statusText}`);
+                const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const text = await res.text();
+                // Sanity-check: must look like XML/RSS
+                if (!text.trim().startsWith('<')) throw new Error('Response is not XML');
+                return text;
             } catch (err) {
-                if (i < retries - 1) {
-                    await new Promise(r => setTimeout(r, delay));
-                    continue;
-                }
-                throw err;
+                console.warn(`Proxy failed (${proxyUrl}):`, err.message);
+                lastError = err;
             }
         }
+        throw lastError || new Error('All proxies failed');
     }
 
-    /** Show skeleton loading cards */
     function showSkeleton(count = 5) {
         const container = document.getElementById('news');
         container.innerHTML = Array.from({ length: count }, () => `
@@ -473,7 +467,6 @@
         `).join('');
     }
 
-    // ── Main fetch ─────────────────────────────────────────────────
     async function fetchNews() {
         const newsContainer  = document.getElementById('news');
         const resultCount    = document.getElementById('result-count');
@@ -486,16 +479,13 @@
         const location       = document.getElementById('location-search').value.trim();
         const [language, region] = languageSelect.value.split('|');
 
-        // FIX 2: Declare requestDetails BEFORE try so catch can reference it
         let requestDetails = { topic, location, newsCount, language, region };
 
-        // Disable controls during fetch
         [refreshBtn, sortBtn, languageSelect, newsCountSel].forEach(el => el.disabled = true);
         resultCount.textContent = '';
         showSkeleton(3);
 
         try {
-            // Build RSS URL
             const baseUrl = 'https://news.google.com/rss';
             let query = topic === 'all' ? '' : topic;
             if (location) {
@@ -508,8 +498,7 @@
             requestDetails.url = rssUrl;
             console.log('Fetching news:', requestDetails);
 
-            const response = await fetchWithRetry('https://corsproxy.io/?' + encodeURIComponent(rssUrl));
-            const text     = await response.text();
+            const text = await fetchRSS(rssUrl);
 
             const parser = new DOMParser();
             const xml    = parser.parseFromString(text, 'text/xml');
@@ -517,18 +506,15 @@
 
             const items = Array.from(xml.querySelectorAll('item'));
 
-            // FIX 1: FIXED sort — ascending branch now correctly uses dateA - dateB
             items.sort((a, b) => {
                 const dateA = new Date(a.querySelector('pubDate')?.textContent || 0);
                 const dateB = new Date(b.querySelector('pubDate')?.textContent || 0);
-                return isSortDescending ? dateB - dateA : dateA - dateB; // ← was dateB - dateA both ways
+                return isSortDescending ? dateB - dateA : dateA - dateB;
             });
 
             newsContainer.innerHTML = '';
-
             const visible = items.slice(0, newsCount);
 
-            // FIX 8: Show result count
             if (items.length > 0) {
                 resultCount.textContent = `Showing ${visible.length} of ${items.length} articles`;
             }
@@ -538,7 +524,6 @@
                 const link     = item.querySelector('link')?.textContent        || '#';
                 const pubDate  = item.querySelector('pubDate')?.textContent     || '';
                 const rawSrc   = item.querySelector('source')?.textContent      || 'Unknown Source';
-                // FIX 5: Extract description; FIX 9: strip HTML tags from it
                 const rawDesc  = item.querySelector('description')?.textContent || '';
                 const desc     = stripTags(rawDesc);
 
@@ -547,9 +532,8 @@
                     hour: '2-digit', minute: '2-digit'
                 }) : 'Unknown date';
 
-                // FIX 3: Escape all user-facing strings before using innerHTML
-                const title  = escapeHtml(rawTitle);
-                const source = escapeHtml(rawSrc);
+                const title    = escapeHtml(rawTitle);
+                const source   = escapeHtml(rawSrc);
                 const safeDesc = escapeHtml(desc);
 
                 const card = document.createElement('article');
@@ -581,13 +565,12 @@
             }
 
         } catch (err) {
-            // FIX 2 (cont.): requestDetails is now always in scope
             console.error('Fetch failed:', { error: err.message, ...requestDetails });
 
-            let msg = 'Failed to load news. Please try again.';
-            if (err.message.includes('HTTP'))          msg = `Server error: ${err.message}. Try refreshing.`;
-            else if (err.message.includes('parse'))    msg = 'Could not parse the news feed. It may be temporarily unavailable.';
-            else if (err.name === 'TypeError')         msg = 'Network error: check your internet connection.';
+            let msg = 'Failed to load news. All proxy attempts failed — please try again later.';
+            if (err.message.includes('HTTP'))       msg = `Server error: ${err.message}. Try refreshing.`;
+            else if (err.message.includes('parse')) msg = 'Could not parse the news feed. It may be temporarily unavailable.';
+            else if (err.name === 'TypeError')      msg = 'Network error: check your internet connection.';
 
             newsContainer.innerHTML = `<div class="status-msg error"><span class="icon">⚠️</span>${escapeHtml(msg)}</div>`;
             resultCount.textContent = '';
@@ -596,7 +579,6 @@
         }
     }
 
-    // ── Content warning modal ──────────────────────────────────────
     function showContentWarning(topic, onAccept) {
         if (shownWarnings[topic]) { onAccept(); return; }
 
@@ -630,8 +612,6 @@
         cancelBtn.addEventListener('click', handleCancel);
     }
 
-    // ── Event wiring ───────────────────────────────────────────────
-
     document.querySelectorAll('.tag').forEach(tag => {
         tag.addEventListener('click', () => {
             document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
@@ -647,10 +627,8 @@
     });
 
     document.getElementById('news-count').addEventListener('change', fetchNews);
-
     document.getElementById('language-select').addEventListener('change', fetchNews);
 
-    // FIX 6: Debounce 600ms, only fire when ≥3 chars or completely empty
     document.getElementById('location-search').addEventListener('input', function () {
         clearTimeout(window.searchTimeout);
         const val = this.value.trim();
@@ -667,7 +645,6 @@
         fetchNews();
     });
 
-    // Initial load
     fetchNews();
 </script>
 </body>
