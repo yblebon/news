@@ -356,6 +356,12 @@
             <option value="google" selected>Google News</option>
             <option value="bbc">BBC News</option>
             <option value="guardian">The Guardian</option>
+            <option value="ft">Financial Times</option>
+            <option value="euronews">Euronews</option>
+            <option value="politico">POLITICO Europe</option>
+            <option value="times">The Times</option>
+            <option value="telegraph">The Telegraph</option>
+            <option value="skysports">Sky Sports</option>
         </select>
     </div>
     <div class="controls-group" id="language-group">
@@ -469,6 +475,130 @@
             buildUrl(topic) {
                 return this.topicFeeds[topic] || this.topicFeeds.all;
             }
+        },
+        ft: {
+            label: 'Powered by Financial Times RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // FT publishes per-section feeds; business & sports don't really exist as feeds,
+            // so they fall back to home.
+            topicFeeds: {
+                all:           'https://www.ft.com/rss/home',
+                technology:    'https://www.ft.com/technology?format=rss',
+                sports:        'https://www.ft.com/rss/home',
+                business:      'https://www.ft.com/companies?format=rss',
+                entertainment: 'https://www.ft.com/life-arts?format=rss',
+                world:         'https://www.ft.com/world?format=rss',
+                death:         'https://www.ft.com/rss/home',
+                accident:      'https://www.ft.com/rss/home',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        euronews: {
+            label: 'Powered by Euronews RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // Euronews uses a single feedburner URL for English — no per-topic feeds,
+            // so all topics map to the same feed.
+            topicFeeds: {
+                all:           'https://feeds.feedburner.com/euronews/en/home/',
+                technology:    'https://feeds.feedburner.com/euronews/en/home/',
+                sports:        'https://feeds.feedburner.com/euronews/en/home/',
+                business:      'https://feeds.feedburner.com/euronews/en/home/',
+                entertainment: 'https://feeds.feedburner.com/euronews/en/home/',
+                world:         'https://feeds.feedburner.com/euronews/en/home/',
+                death:         'https://feeds.feedburner.com/euronews/en/home/',
+                accident:      'https://feeds.feedburner.com/euronews/en/home/',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        politico: {
+            label: 'Powered by POLITICO Europe RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // WordPress-style /section/X/feed/ URLs
+            topicFeeds: {
+                all:           'https://www.politico.eu/feed/',
+                technology:    'https://www.politico.eu/section/technology/feed/',
+                sports:        'https://www.politico.eu/feed/',
+                business:      'https://www.politico.eu/section/competition-and-industrial-policy/feed/',
+                entertainment: 'https://www.politico.eu/feed/',
+                world:         'https://www.politico.eu/feed/',
+                death:         'https://www.politico.eu/feed/',
+                accident:      'https://www.politico.eu/feed/',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        times: {
+            label: 'Powered by The Times (via Open RSS — personal use)',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // The Times killed its official RSS feeds in 2023. These come from openrss.org,
+            // a nonprofit that scrapes pages into RSS. Their terms restrict feeds to
+            // personal/non-commercial use, and items are delayed + limited.
+            topicFeeds: {
+                all:           'https://openrss.org/www.thetimes.com',
+                technology:    'https://openrss.org/www.thetimes.com/business-money/technology',
+                sports:        'https://openrss.org/www.thetimes.com/sport',
+                business:      'https://openrss.org/www.thetimes.com/business-money',
+                entertainment: 'https://openrss.org/www.thetimes.com/culture',
+                world:         'https://openrss.org/www.thetimes.com/world',
+                death:         'https://openrss.org/www.thetimes.com',
+                accident:      'https://openrss.org/www.thetimes.com',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        telegraph: {
+            label: 'Powered by The Telegraph RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            topicFeeds: {
+                all:           'https://www.telegraph.co.uk/rss.xml',
+                technology:    'https://www.telegraph.co.uk/technology/rss.xml',
+                sports:        'https://www.telegraph.co.uk/sport/rss.xml',
+                business:      'https://www.telegraph.co.uk/business/rss.xml',
+                entertainment: 'https://www.telegraph.co.uk/culture/rss.xml',
+                world:         'https://www.telegraph.co.uk/world-news/rss.xml',
+                death:         'https://www.telegraph.co.uk/news/rss.xml',
+                accident:      'https://www.telegraph.co.uk/news/rss.xml',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
+        },
+        skysports: {
+            label: 'Powered by Sky Sports RSS',
+            supportsLanguage: false,
+            supportsLocation: false,
+            supportsTopics: true,
+            // Sky Sports publishes a single aggregate feed keyed by ID 12040.
+            // It's sport-focused by nature, so non-sport topics fall back to the same feed.
+            topicFeeds: {
+                all:           'https://www.skysports.com/rss/12040',
+                technology:    'https://www.skysports.com/rss/12040',
+                sports:        'https://www.skysports.com/rss/12040',
+                business:      'https://www.skysports.com/rss/12040',
+                entertainment: 'https://www.skysports.com/rss/12040',
+                world:         'https://www.skysports.com/rss/12040',
+                death:         'https://www.skysports.com/rss/12040',
+                accident:      'https://www.skysports.com/rss/12040',
+            },
+            buildUrl(topic) {
+                return this.topicFeeds[topic] || this.topicFeeds.all;
+            }
         }
     };
 
@@ -480,10 +610,20 @@
     let isSortDescending = true;
 
     // ── CORS proxies to try in order ───────────────────────────────
-    // allorigins wraps JSON; use /raw?url= to get the raw RSS text directly
+    // If you deploy your own Cloudflare Worker (see bottom of file for the snippet),
+    // paste its URL into MY_WORKER_URL and it will be tried first. Leave empty
+    // to fall back to public proxies.
+    const MY_WORKER_URL = 'hello-world.ysr-b-lebon.workers.dev/?url='; // e.g. 'https://my-rss-proxy.yourname.workers.dev/?url='
+
     const PROXIES = [
+        // Self-hosted first (fastest + most reliable when configured)
+        ...(MY_WORKER_URL ? [url => `${MY_WORKER_URL}${encodeURIComponent(url)}`] : []),
+        // allorigins: /raw returns the response body as-is
         url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        // codetabs: simple, no auth required
+        url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+        // corsproxy.io: kept last because it now rejects some origins with 403
+        url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     ];
 
     function escapeHtml(str) {
